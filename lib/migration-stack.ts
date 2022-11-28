@@ -38,16 +38,8 @@ export class MigrationStack extends cdk.Stack {
       ? new ec2.InstanceType(props.databaseInstanceType)
       : ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.LARGE);
     const sqlServerInstance = databaseSnapshot
-      ? this.createSqlServerInstanceFromSnapshot(
-          vpc,
-          databaseSnapshot,
-          databaseInstanceType
-        )
-      : this.createSqlServerInstance(
-          vpc,
-          artifactsBucket,
-          databaseInstanceType
-        );
+      ? this.createSqlServerInstanceFromSnapshot(vpc, databaseSnapshot, databaseInstanceType)
+      : this.createSqlServerInstance(vpc, artifactsBucket, databaseInstanceType);
     this.sqlServerInstance = sqlServerInstance;
 
     // Aurora Cluster
@@ -59,10 +51,7 @@ export class MigrationStack extends cdk.Stack {
       instanceProps: {
         vpc,
         vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
-        instanceType: ec2.InstanceType.of(
-          ec2.InstanceClass.R6G,
-          ec2.InstanceSize.LARGE
-        ),
+        instanceType: databaseInstanceType,
       },
       credentials: rds.Credentials.fromGeneratedSecret("dbadmin", {
         excludeCharacters: " %+~`#$&*()|[]{}:;<>?!'/@\"\\,^",

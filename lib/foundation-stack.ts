@@ -2,9 +2,6 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
-import * as rds from 'aws-cdk-lib/aws-rds';
-import * as secretmanager from 'aws-cdk-lib/aws-secretsmanager';
-import { Stack } from 'aws-cdk-lib';
 
 export interface FoundationStackProps extends cdk.StackProps {
   vpcId?: string;
