@@ -26,8 +26,9 @@ export class TestBenchStack extends cdk.Stack {
     const queryLoaderFunction = new DotNetFunction(this, 'QueryLoaderFunction', {
       projectDir: 'src/MigrationAssistant.Functions.QueryLoader',
       environment: {
-        KINESIS_STREAM_NAME: this.queryStream.streamName,
-      }
+        QUERY_STREAM_NAME: this.queryStream.streamName,
+      },
+      timeout: cdk.Duration.minutes(1),
     });
     this.queryStream.grantWrite(queryLoaderFunction);
     artifactsBucket.grantRead(queryLoaderFunction);

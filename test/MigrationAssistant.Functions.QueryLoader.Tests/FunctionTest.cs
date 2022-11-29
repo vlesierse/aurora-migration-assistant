@@ -6,7 +6,7 @@ public class FunctionTest
     [Fact]
     public async Task TestFunction()
     {
-        var function = new Function();
+        var function = new Function(new FunctionOptions());
         await function.FunctionHandler(
             new QueryLoaderEvent {
                 S3ObjectBucketName = "amaencore-artifacts82dd59a1-xcbm4x75xg8s",

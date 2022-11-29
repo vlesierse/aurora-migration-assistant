@@ -1,7 +1,7 @@
 ﻿using Amazon.Lambda.TestUtilities;
 using MigrationAssistant.Functions.QueryLoader;
 
-var function = new Function();
+var function = new Function(new FunctionOptions { QueryStreamName = "AMAEncore-TestBench-QueryStreamB2BF2DBD-Jq80SIbQzcHk" });
 await function.FunctionHandler(
     new QueryLoaderEvent { 
         S3ObjectKey = "ReadTrace_0_133070265302890000.xel",

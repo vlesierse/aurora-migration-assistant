@@ -2,7 +2,6 @@ using Amazon.Lambda.Core;
 using Amazon.S3;
 using Amazon.Kinesis;
 using Microsoft.SqlServer.XEvent.XELite;
-using MigrationAssistant.Shared;
 using MigrationAssistant.Shared.Records;
 using Amazon.Kinesis.Model;
 using System.Text.Json;
@@ -18,7 +17,7 @@ public class Function
 
     private IAmazonS3 _s3Client;
     private IAmazonKinesis _kinesisClient;
-    private string _kinesisStreamName;
+    private string _queryStreamName;
 
     /// <summary>
     /// Default constructor. This constructor is used by Lambda to construct the instance. When invoked in a Lambda environment
@@ -26,7 +25,7 @@ public class Function
     /// region the Lambda function is executed in.
     /// </summary>
     public Function()
-        : this(Environment.GetEnvironmentVariable("KINESIS_STREAM_NAME"))
+        : this(new AmazonS3Client(), new AmazonKinesisClient(), new FunctionOptions())
     { }
 
     /// <summary>
@@ -34,19 +33,19 @@ public class Function
     /// the AWS credentials will come from the IAM role associated with the function and the AWS region will be set to the
     /// region the Lambda function is executed in.
     /// </summary>
-    public Function(string? kinesisStreamName)
-        : this(new AmazonS3Client(), new AmazonKinesisClient(), kinesisStreamName)
+    public Function(FunctionOptions options)
+        : this(new AmazonS3Client(), new AmazonKinesisClient(), options)
     { }
 
     /// <summary>
     /// Constructs an instance with a preconfigured S3 client. This can be used for testing the outside of the Lambda environment.
     /// </summary>
     /// <param name="s3Client"></param>
-    public Function(IAmazonS3 s3Client, IAmazonKinesis kinesisClient, string? kinesisStreamName)
+    public Function(IAmazonS3 s3Client, IAmazonKinesis kinesisClient, FunctionOptions options)
     {
         _s3Client = s3Client;
         _kinesisClient = kinesisClient;
-        _kinesisStreamName = kinesisStreamName ?? throw new ArgumentNullException(nameof(kinesisStreamName));
+        _queryStreamName = options.QueryStreamName ?? throw new ArgumentNullException(nameof(options));
     }
 
     public async Task FunctionHandler(QueryLoaderEvent @event, ILambdaContext context)
@@ -66,16 +65,23 @@ public class Function
                 return Task.CompletedTask;
             },
             async xevent => {
-                var batchText = xevent.Fields["batch_text"]?.ToString();
-                var sessionId = (int?)xevent.Actions["session_id"];
-                if (!string.IsNullOrEmpty(batchText) && sessionId.HasValue)
+                string? queryText = null;
+                if(xevent.Fields.TryGetValue("batch_text", out var batchTextObject))
                 {
+                    queryText = batchTextObject.ToString();
+                } else if(xevent.Actions.TryGetValue("statement", out var statementObject))
+                {
+                    queryText = statementObject.ToString();
+                }
+                if (!String.IsNullOrEmpty(queryText))
+                {
+                    var sessionId = (UInt16)xevent.Actions["session_id"];
                     await WriteToQueryStream(new QueryRecord
                     {
                         TestsetId = testsetId,
                         QueryId = Guid.NewGuid(),
-                        SessionId = sessionId.Value,
-                        QueryText = batchText
+                        SessionId = sessionId,
+                        QueryText = queryText
                     });
                 }
             },
@@ -89,7 +95,7 @@ public class Function
     private long _putRecordsRequestEntrySize = 0;
 
     private const int MAX_RECORDS_PER_PUT = 500;
-    private const long MAX_RECORDS_SIZE = 5 * 1024 * 1024; // 5 MB
+    private const long MAX_RECORDS_SIZE = (5 * 1024 * 1024) - (16 * 1024); // 5 MB - 16 KB
 
     private async Task WriteToQueryStream(QueryRecord record)
     {
@@ -112,7 +118,7 @@ public class Function
         {
             await _kinesisClient.PutRecordsAsync(new PutRecordsRequest
             {
-                StreamName = _kinesisStreamName,
+                StreamName = _queryStreamName,
                 Records = _putRecordsRequestEntries
             });
             _putRecordsRequestEntries.Clear();

@@ -45,7 +45,7 @@ export class Bundling implements cdk.BundlingOptions {
     const bundling = new Bundling(options);
 
     return Code.fromAsset(path.dirname(options.projectDir), {
-      assetHashType: options.assetHashType ?? cdk.AssetHashType.OUTPUT,
+      assetHashType: options.assetHashType ?? cdk.AssetHashType.SOURCE,
       assetHash: options.assetHash,
       bundling: {
         image: bundling.image,
@@ -124,8 +124,6 @@ export class Bundling implements cdk.BundlingOptions {
     const dotnetPackageCommand: string = ['dotnet', 'lambda', 'package', '--output-package', packageFile].filter(c => !!c).join(' ');
     const unzipCommand: string = ['unzip', '-od', outputDir, packageFile].filter(c => !!c).join(' ');
     const deleteCommand: string = ['rm', packageFile].filter(c => !!c).join(' ');
-
-    console.log(dotnetPackageCommand);
 
     return chain([
       ...this.props.commandHooks?.beforeBundling(inputDir, outputDir) ?? [],
