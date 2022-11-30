@@ -17,12 +17,7 @@ await function.FunctionHandler(
 using MigrationAssistant.Functions.QueryExecutor;
 
 
-var function = new Function(new FunctionOptions {
-    ResultStreamName = "AMAEncore-TestBench-ResultsStream-246LmncBYPqF",
-    DatabaseName = "EOLNL_Customers_19",
-    DatabaseUsername = "dbadmin",
-    DatabasePassword = "LobXO8UAx_2e1pqfEk6TMb1yR-G_NB",
-});
+var function = new Function();
 
 var message = """
     {
