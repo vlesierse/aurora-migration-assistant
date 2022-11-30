@@ -36,7 +36,7 @@ export class MigrationStack extends cdk.Stack {
     // SQL Server Instance
     const databaseInstanceType = props.databaseInstanceType
       ? new ec2.InstanceType(props.databaseInstanceType)
-      : ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.LARGE);
+      : ec2.InstanceType.of(ec2.InstanceClass.R6I, ec2.InstanceSize.XLARGE);
     const sqlServerInstance = databaseSnapshot
       ? this.createSqlServerInstanceFromSnapshot(vpc, databaseSnapshot, databaseInstanceType)
       : this.createSqlServerInstance(vpc, artifactsBucket, databaseInstanceType);

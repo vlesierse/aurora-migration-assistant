@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import { spawnSync, SpawnSyncOptions } from "child_process";
 
 export function getDotNetLambdaTools(): boolean | undefined {
@@ -27,4 +29,16 @@ export function exec(cmd: string, args: string[], options?: SpawnSyncOptions) {
   }
 
   return proc;
+}
+
+export function findUp(ext: string, directory: string = process.cwd()): string | undefined {
+  const absoluteDirectory = path.resolve(directory);
+
+  const file = fs.readdirSync(absoluteDirectory).find((file) => file.endsWith(ext))
+  if (file) {
+    return path.join(absoluteDirectory, file);
+  }
+  
+  const { root } = path.parse(absoluteDirectory);
+  return absoluteDirectory == root ? undefined : findUp(ext, path.dirname(absoluteDirectory));
 }

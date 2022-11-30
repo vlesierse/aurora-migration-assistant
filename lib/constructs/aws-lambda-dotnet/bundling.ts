@@ -6,19 +6,9 @@ import { BundlingOptions } from "./types";
 import { exec, getDotNetLambdaTools } from './util';
 
 export interface BundlingProps extends BundlingOptions {
-  /**
-   * Directory containing your go.mod file
-   *
-   * This will accept either a directory path containing a `go.mod` file
-   * or a filepath to your `go.mod` file (i.e. `path/to/go.mod`).
-   *
-   * This will be used as the source of the volume mounted in the Docker
-   * container and will be the directory where it will run `go build` from.
-   *
-   * @default - the path is found by walking up parent directories searching for
-   *  a `go.mod` file from the location of `entry`
-   */
   readonly projectDir: string;
+
+  readonly solutionDir: string;
 
   /**
    * The runtime of the lambda function
@@ -44,7 +34,7 @@ export class Bundling implements cdk.BundlingOptions {
   public static bundle(options: BundlingProps): AssetCode {
     const bundling = new Bundling(options);
 
-    return Code.fromAsset(path.dirname(options.projectDir), {
+    return Code.fromAsset(path.dirname(options.solutionDir), {
       assetHashType: options.assetHashType ?? cdk.AssetHashType.SOURCE,
       assetHash: options.assetHash,
       bundling: {
@@ -59,8 +49,8 @@ export class Bundling implements cdk.BundlingOptions {
   constructor(private readonly props: BundlingProps) {
     Bundling.runsLocally = Bundling.runsLocally ?? getDotNetLambdaTools() ?? false;
 
-    const projectRoot = props.projectDir;
-    this.relativeProjectPath = `./${props.projectDir}`;
+    const solutionDir = props.solutionDir;
+    this.relativeProjectPath = `./${path.relative(solutionDir, path.resolve(props.projectDir))}`;
 
     const environment = {
       ...props.environment,
@@ -86,7 +76,7 @@ export class Bundling implements cdk.BundlingOptions {
     // Local bundling
     if (!props.forcedDockerBundling) { // only if Docker is not forced
       const osPlatform = os.platform();
-      const createLocalCommand = (outputDir: string) => this.createBundlingCommand(projectRoot, outputDir, osPlatform);
+      const createLocalCommand = (outputDir: string) => this.createBundlingCommand(solutionDir, outputDir, osPlatform);
       this.local = {
         tryBundle(outputDir: string) {
           if (Bundling.runsLocally == false) {
@@ -107,7 +97,7 @@ export class Bundling implements cdk.BundlingOptions {
                 process.stderr, // redirect stdout to stderr
                 'inherit', // inherit stderr
               ],
-              cwd: props.projectDir,
+              cwd: props.solutionDir,
               windowsVerbatimArguments: osPlatform === 'win32',
             },
           );
@@ -120,16 +110,15 @@ export class Bundling implements cdk.BundlingOptions {
   public createBundlingCommand(inputDir: string, outputDir: string, osPlatform: NodeJS.Platform = 'linux'): string {
     const pathJoin = osPathJoin(osPlatform);
 
-    const packageFile = pathJoin(outputDir, 'package.zip');
-    const dotnetPackageCommand: string = ['dotnet', 'lambda', 'package', '--output-package', packageFile].filter(c => !!c).join(' ');
+    const projectLocation = this.relativeProjectPath.replace(/\\/g, '/')
+    const packageFile = pathJoin(projectLocation, 'package.zip');
+    const dotnetPackageCommand: string = ['dotnet', 'lambda', 'package', '--project-location', projectLocation,  '--output-package', packageFile].filter(c => !!c).join(' ');
     const unzipCommand: string = ['unzip', '-od', outputDir, packageFile].filter(c => !!c).join(' ');
     const deleteCommand: string = ['rm', packageFile].filter(c => !!c).join(' ');
 
     return chain([
       ...this.props.commandHooks?.beforeBundling(inputDir, outputDir) ?? [],
-      dotnetPackageCommand,
-      unzipCommand,
-      deleteCommand,
+      dotnetPackageCommand, unzipCommand, deleteCommand,
       ...this.props.commandHooks?.afterBundling(inputDir, outputDir) ?? [],
     ]);
   }

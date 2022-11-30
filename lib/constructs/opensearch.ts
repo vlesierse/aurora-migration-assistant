@@ -50,6 +50,6 @@ export class OpenSearch extends Construct {
     });
     this.domain.grantReadWrite(identityPool.authenticatedRole);
 
-    new cdk.CfnOutput(this, 'OpenSearchEndpoint', { value: this.domain.domainEndpoint });
+    new cdk.CfnOutput(this, 'OpenSearchEndpoint', { value: `https://${this.domain.domainEndpoint}/_dashboards` });
   }
 }

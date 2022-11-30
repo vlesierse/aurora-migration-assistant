@@ -14,42 +14,59 @@ namespace MigrationAssistant.Functions.QueryExecutor;
 public class Function
 {
 
-    private IAmazonKinesisFirehose _firehoseClient;
+    private SqlServerClient _sqlServerClient;
+    private IAmazonKinesisFirehose _firehoseClient;    
+    private string _databaseEngine;
     private string _resultStreamName;
+    
 
     public Function()
-        : this(new AmazonKinesisFirehoseClient(), new FunctionOptions())
+        : this(new FunctionOptions())
+    { }
+
+    public Function(FunctionOptions options)
+        : this(new AmazonKinesisFirehoseClient(), options)
     { }
 
     public Function(IAmazonKinesisFirehose firehoseClient, FunctionOptions options)
     {
+        _databaseEngine = options.DatabaseEngine;
         _firehoseClient = firehoseClient;
-        _resultStreamName = options.ResultstreamName ?? throw new ArgumentException(nameof(FileOptions), "RESULTS_STREAM_NAME environment variable is not set");
+        _resultStreamName = options.ResultStreamName ?? throw new ArgumentException(nameof(FileOptions), "RESULT_STREAM_NAME environment variable is not set");
+        _sqlServerClient = new SqlServerClient($"Server={options.DatabaseHost},{options.DatabasePort};Database={options.DatabaseName};User Id={options.DatabaseUsername};Password={options.DatabasePassword};");
     }
 
     public async Task FunctionHandler(KinesisEvent kinesisEvent, ILambdaContext context)
     {
         context.Logger.LogInformation($"Beginning to process {kinesisEvent.Records.Count} records...");
-
-        foreach (var record in kinesisEvent.Records)
+        foreach (var record in kinesisEvent.Records.Select(GetStatementRecord))
         {
-            context.Logger.LogInformation($"Event ID: {record.EventId}");
-            context.Logger.LogInformation($"Event Name: {record.EventName}");
-
-            string recordData = GetRecordContents(record.Kinesis);
-            context.Logger.LogInformation($"Record Data:");
-            context.Logger.LogInformation(recordData);
+            if (record != null && record.Statement != null) {
+                var result = await _sqlServerClient.ExecuteStatement(record.SessionId, record.Statement);
+                await WriteToResultsStream(new StatementResultRecord(record) {
+                    Success = result.IsSucceeded,
+                    ErrorMessage = result.ErrorMessage,
+                    ExecutionTime = result.ExecutionTime,
+                    Duration = result.Duration,
+                    DatabaseEngine = _databaseEngine
+                });
+            }
         }
         await FlushResultsStream(); // Flush the remaining records
+        await _sqlServerClient.CloseConnections; // Close all connections
         context.Logger.LogInformation("Stream processing complete.");
     }
 
-    private string GetRecordContents(KinesisEvent.Record streamRecord)
+    private StatementRecord? GetStatementRecord(KinesisEvent.KinesisEventRecord record)
+    {
+        using (var reader = new StreamReader(record.Kinesis.Data, Encoding.UTF8))
+        return JsonSerializer.Deserialize<StatementRecord>(reader.ReadToEnd());
+    }
+
+    private Task<string> GetRecordContentsAsync(KinesisEvent.Record streamRecord)
     {
         using (var reader = new StreamReader(streamRecord.Data, Encoding.UTF8))
-        {
-            return reader.ReadToEnd();
-        }
+        return reader.ReadToEndAsync();
     }
 
     private List<Record> _firehoseRecords = new();
@@ -57,7 +74,7 @@ public class Function
     private const int MAX_RECORDS_PER_PUT = 500;
     private const long MAX_RECORDS_SIZE = (4 * 1024 * 1024) - (16 * 1024); // 5 MB - 16 KB
 
-    private async Task WriteToResultsStream(ResultRecord record)
+    private async Task WriteToResultsStream(StatementResultRecord record)
     {
         var entry = new Record
         {

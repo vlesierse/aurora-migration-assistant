@@ -26,7 +26,7 @@ new MigrationStack(app, stackName + '-Migration', {
 
 const bench = new TestBenchStack(app, stackName + '-TestBench', {
   artifactsBucket: foundation.artifactsBucket,
-  concurrency: app.node.tryGetContext('concurrency') || 1,
+  concurrency: parseInt(app.node.tryGetContext('concurrency') || "1"),
 });
 
 new TestEnvironmentStack(app, stackName + '-TestEnvironment', {

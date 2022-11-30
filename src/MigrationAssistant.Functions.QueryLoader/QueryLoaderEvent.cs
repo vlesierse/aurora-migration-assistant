@@ -4,4 +4,5 @@ public class QueryLoaderEvent
 {
     public string S3ObjectKey { get; set; }
     public string S3ObjectBucketName { get; set; }
+    public int? Limit { get; set; }
 }

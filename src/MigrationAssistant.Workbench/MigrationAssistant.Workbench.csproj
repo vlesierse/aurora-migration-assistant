@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../MigrationAssistant.Functions.QueryLoader/MigrationAssistant.Functions.QueryLoader.csproj" />
+    <ProjectReference Include="../MigrationAssistant.Functions.QueryExecutor/MigrationAssistant.Functions.QueryExecutor.csproj" />
   </ItemGroup>
 
 </Project>

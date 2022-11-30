@@ -17,6 +17,7 @@ public class Function
 
     private IAmazonS3 _s3Client;
     private IAmazonKinesis _kinesisClient;
+    private int? _limit;
     private string _queryStreamName;
 
     /// <summary>
@@ -52,42 +53,49 @@ public class Function
     {
         context.Logger.LogInformation($"Beginning to load with Extended Events {@event.S3ObjectBucketName}/{@event.S3ObjectKey}...");
         
-        var testsetId = Guid.NewGuid();
+        var limit = @event.Limit;
+        var testsetId = Guid.NewGuid();        
 
         // Load the Extended Events file into memory from S3
         var response = await _s3Client.GetObjectAsync(@event.S3ObjectBucketName, @event.S3ObjectKey);
         using var responseStream = response.ResponseStream;
         // Read extended events from the response stream
         var xeStream = new XEFileEventStreamer(responseStream);
+        int loadedEventCount = 0;
         await xeStream.ReadEventStream(
             () => {
                 Console.WriteLine("Headers found");
                 return Task.CompletedTask;
             },
             async xevent => {
-                string? queryText = null;
+                if(limit.HasValue && loadedEventCount >= limit.Value)
+                {
+                    return;
+                }
+                string? statement = null;
                 if(xevent.Fields.TryGetValue("batch_text", out var batchTextObject))
                 {
-                    queryText = batchTextObject.ToString();
+                    statement = batchTextObject.ToString();
                 } else if(xevent.Actions.TryGetValue("statement", out var statementObject))
                 {
-                    queryText = statementObject.ToString();
+                    statement = statementObject.ToString();
                 }
-                if (!String.IsNullOrEmpty(queryText))
+                if (!String.IsNullOrEmpty(statement))
                 {
                     var sessionId = (UInt16)xevent.Actions["session_id"];
-                    await WriteToQueryStream(new QueryRecord
+                    await WriteToQueryStream(new StatementRecord
                     {
                         TestsetId = testsetId,
-                        QueryId = Guid.NewGuid(),
+                        StatementId = Guid.NewGuid(),
                         SessionId = sessionId,
-                        QueryText = queryText
+                        Statement = statement
                     });
+                    loadedEventCount++;
                 }
             },
             CancellationToken.None);
         await FlushQueryStream(); // Flush the remaining records
-        context.Logger.LogInformation("Loading complete.");
+        context.Logger.LogInformation($"Loaded {loadedEventCount} events");
     }
     
 
@@ -97,7 +105,7 @@ public class Function
     private const int MAX_RECORDS_PER_PUT = 500;
     private const long MAX_RECORDS_SIZE = (5 * 1024 * 1024) - (16 * 1024); // 5 MB - 16 KB
 
-    private async Task WriteToQueryStream(QueryRecord record)
+    private async Task WriteToQueryStream(StatementRecord record)
     {
         var entry = new PutRecordsRequestEntry
         {
