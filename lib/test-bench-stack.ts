@@ -4,8 +4,8 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as kinesis from 'aws-cdk-lib/aws-kinesis';
 import * as firehose from 'aws-cdk-lib/aws-kinesisfirehose';
 import { Construct } from 'constructs';
-import { DotNetFunction } from './constructs/aws-lambda-dotnet';
 import { OpenSearch } from './constructs/opensearch';
+import { DotNetFunction } from '@xaaskit-cdk/aws-lambda-dotnet';
 
 export interface TestBenchStackProps extends cdk.StackProps {
   readonly artifactsBucket: s3.IBucket;
@@ -95,6 +95,7 @@ export class TestBenchStack extends cdk.Stack {
         },
       }
     });
+    resultsStream.node.addDependency(resultsStreamRole);
     this.resultsStreamName = resultsStream.ref;
   }
 }

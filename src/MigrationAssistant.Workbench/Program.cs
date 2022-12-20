@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Text.RegularExpressions;
 using Amazon.Lambda.KinesisEvents;
 using Amazon.Lambda.TestUtilities;
 
@@ -14,7 +15,7 @@ await function.FunctionHandler(
     new TestLambdaContext()
 );*/
 
-using MigrationAssistant.Functions.QueryExecutor;
+/*using MigrationAssistant.Functions.QueryExecutor;
 
 
 var function = new Function();
@@ -38,4 +39,12 @@ var records = new List<KinesisEvent.KinesisEventRecord>
         }
     }
 };
-await function.FunctionHandler(new KinesisEvent { Records = records}, new TestLambdaContext());
+await function.FunctionHandler(new KinesisEvent { Records = records}, new TestLambdaContext());*/
+
+var statement = "exec sp_executesql N'SELECT TOP 5000 AssemblyOrders.ID, AssemblyOrders.timestamp As TimestampBytes, AssemblyOrders.Division, AssemblyOrders.sysmodified, AssemblyOrders.syscreated, Description As AssemblyOrderDescription, Number As AssemblyOrderNumber FROM AssemblyOrders WHERE AssemblyOrders.[timestamp] > CAST(CAST(155840065 AS bigint) AS timestamp) ORDER BY 2',N'@timestamp int,@pageSize int,@division nvarchar(4000),@upperLimitTimestamp nvarchar(4000)',@timestamp=155840065,@pageSize=5000,@division=NULL,@upperLimitTimestamp=NULL";
+Console.WriteLine(statement);
+
+Regex ParameterRegEx = new Regex(@"\@\w+");
+var matches = ParameterRegEx.Matches(statement);
+statement = ParameterRegEx.Replace(statement, m => m.Value.ToLower());
+Console.WriteLine(statement);

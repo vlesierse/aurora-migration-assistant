@@ -6,6 +6,7 @@ using MigrationAssistant.Shared.Records;
 using Amazon.Kinesis.Model;
 using System.Text.Json;
 using System.Text;
+using System.Text.RegularExpressions;
 
 // Assembly attribute to enable the Lambda function's JSON input to be converted into a .NET class.
 [assembly: LambdaSerializer(typeof(Amazon.Lambda.Serialization.SystemTextJson.DefaultLambdaJsonSerializer))]
@@ -72,13 +73,23 @@ public class Function
                 {
                     return;
                 }
-                string? statement = null;
-                if(xevent.Fields.TryGetValue("batch_text", out var batchTextObject))
+                if (xevent.Name != "sql_batch_completed" && xevent.Name != "rpc_completed")
                 {
-                    statement = batchTextObject.ToString();
-                } else if(xevent.Actions.TryGetValue("statement", out var statementObject))
+                    return;
+                }
+                if (xevent.Fields.TryGetValue("object_name", out object? objectName) && objectName.ToString() == "sp_reset_connection")
+                {
+                    return;
+                }
+
+                string? statement = null;
+                if(xevent.Fields.TryGetValue("statement", out var statementObject))
                 {
                     statement = statementObject.ToString();
+                }
+                else if(xevent.Fields.TryGetValue("batch_text", out var batchTextObject))
+                {
+                    statement = batchTextObject.ToString();
                 }
                 if (!String.IsNullOrEmpty(statement))
                 {
@@ -88,7 +99,7 @@ public class Function
                         TestsetId = testsetId,
                         StatementId = Guid.NewGuid(),
                         SessionId = sessionId,
-                        Statement = statement
+                        Statement = RewriteParameters(statement)
                     });
                     loadedEventCount++;
                 }
@@ -133,4 +144,7 @@ public class Function
             _putRecordsRequestEntrySize = 0;
         }
     }
+
+    private static Regex ParameterRegEx = new Regex(@"\@\w+", RegexOptions.Compiled);
+    private static string RewriteParameters(string statement) => ParameterRegEx.Replace(statement, m => m.Value.ToLower());
 }

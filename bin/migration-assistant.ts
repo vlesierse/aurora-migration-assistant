@@ -39,4 +39,5 @@ new TestEnvironmentStack(app, stackName + '-TestEnvironment', {
   bastionInstance: foundation.bastionInstance,
   queryStream: bench.queryStream,
   resultsStreamName: bench.resultsStreamName,
+  artifactsBucket: foundation.artifactsBucket,
 });

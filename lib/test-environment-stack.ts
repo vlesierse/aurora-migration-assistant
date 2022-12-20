@@ -1,4 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
+import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as rds from 'aws-cdk-lib/aws-rds';
@@ -7,7 +8,7 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as kinesis from 'aws-cdk-lib/aws-kinesis';
 import * as eventsources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Construct } from 'constructs';
-import { DotNetFunction } from './constructs/aws-lambda-dotnet';
+import { DotNetFunction } from '@xaaskit-cdk/aws-lambda-dotnet';
 
 export interface TestEnvironmentStackProps extends cdk.StackProps {
   readonly vpc: ec2.IVpc;
@@ -20,13 +21,14 @@ export interface TestEnvironmentStackProps extends cdk.StackProps {
   readonly bastionInstance?: ec2.IInstance;
   readonly sqlServerSnapshot?: string;
   readonly sqlServerInstanceType?: string;
+  readonly artifactsBucket: s3.IBucket;
 }
 
 export class TestEnvironmentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: TestEnvironmentStackProps) {
     super(scope, id, props);
 
-    const { vpc, queryStream, databaseName, resultsStreamName, bastionInstance } = props;
+    const { vpc, queryStream, databaseName, resultsStreamName, bastionInstance, artifactsBucket } = props;
 
     const auroraInstanceType = props.auroraInstanceType
       ? new ec2.InstanceType(props.auroraInstanceType)
@@ -97,7 +99,8 @@ export class TestEnvironmentStack extends cdk.Stack {
           instanceType: sqlserverInstanceType,
           snapshotIdentifier: props.sqlServerSnapshot,
           enablePerformanceInsights: true,
-          performanceInsightRetention: rds.PerformanceInsightRetention.LONG_TERM
+          performanceInsightRetention: rds.PerformanceInsightRetention.LONG_TERM,
+          s3ImportBuckets: [artifactsBucket],
         }
       );
 
