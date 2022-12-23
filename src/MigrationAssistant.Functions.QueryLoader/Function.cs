@@ -99,7 +99,7 @@ public class Function
                         TestsetId = testsetId,
                         StatementId = Guid.NewGuid(),
                         SessionId = sessionId,
-                        Statement = RewriteParameters(statement)
+                        Statement = RewriteSessionContext(RewriteParameters(statement))
                     });
                     loadedEventCount++;
                 }
@@ -147,4 +147,5 @@ public class Function
 
     private static Regex ParameterRegEx = new Regex(@"\@\w+", RegexOptions.Compiled);
     private static string RewriteParameters(string statement) => ParameterRegEx.Replace(statement, m => m.Value.ToLower());
+    private static string RewriteSessionContext(string statement) => statement.Replace("sp_set_session_context", "sys.sp_set_session_context", StringComparison.InvariantCultureIgnoreCase);
 }
